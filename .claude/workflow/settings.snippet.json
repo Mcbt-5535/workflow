@@ -1,0 +1,53 @@
+{
+  "_comment": "Snippet to merge into your project's .claude/settings.json. Install.sh does this automatically when jq is available; otherwise merge by hand.",
+  "permissions": {
+    "allow": [
+      "Bash(git diff:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git show:*)",
+      "Bash(date:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Write(.claude/workflow/plans/**)",
+      "Write(.claude/workflow/summaries/**)",
+      "Write(.claude/workflow/archive/**)",
+      "Edit(.claude/workflow/plans/**)",
+      "Edit(.claude/workflow/summaries/**)",
+      "Edit(.claude/workflow/archive/**)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/wf-session-start.sh" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/wf-post-tool.sh" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/wf-stop.sh" }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/wf-session-end.sh" }
+        ]
+      }
+    ]
+  }
+}

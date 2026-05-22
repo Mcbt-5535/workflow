@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(git diff:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git show:*)",
+      "Bash(date:*)",
+      "Bash(ls:*)",
+      "Bash(cat .claude/**)",
+      "Bash(grep:*)",
+      "Read(./**)",
+      "Write(.claude/workflow/plans/**)",
+      "Write(.claude/workflow/summaries/**)",
+      "Write(.claude/workflow/archive/**)",
+      "Edit(.claude/workflow/plans/**)",
+      "Edit(.claude/workflow/summaries/**)",
+      "Edit(.claude/workflow/archive/**)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git reset:*)",
+      "Bash(rm:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/wf-session-start.sh" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/wf-post-tool.sh" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/wf-stop.sh" }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/wf-session-end.sh" }
+        ]
+      }
+    ]
+  }
+}
