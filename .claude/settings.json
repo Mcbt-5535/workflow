@@ -1,5 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "WF_ALLOW_AUTO_COMMIT": "false"
+  },
   "permissions": {
     "allow": [
       "Bash(git diff:*)",
@@ -20,12 +23,24 @@
       "Edit(.claude/workflow/archive/**)"
     ],
     "ask": [
+      "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(git reset:*)",
       "Bash(rm:*)"
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git commit:*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ \"$WF_ALLOW_AUTO_COMMIT\" != \"true\" ]; then echo '{\"systemMessage\":\"Auto-commit is disabled. Set WF_ALLOW_AUTO_COMMIT=true to enable.\",\"continue\":false,\"stopReason\":\"Git commit blocked: WF_ALLOW_AUTO_COMMIT is false\"}'; else echo '{\"continue\":true}'; fi"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "startup|resume",

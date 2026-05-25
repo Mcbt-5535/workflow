@@ -89,6 +89,10 @@ After installing, the project-facing docs live at:
 
 This top-level README only covers installation. Everything else is in the namespace.
 
+## Developing this repo
+
+Runtime data under `.claude/workflow/{plans,summaries,archive}/` is gitignored in this repo so dogfooding doesn't pollute commits. Downstream projects should add the same patterns to their own `.gitignore` if they want the same behavior.
+
 ## Standalone test
 
 You can also use this template directory itself as a working project to try the
