@@ -32,6 +32,12 @@ When the user asks a question, gives a one-line fix, or explores: respond direct
 
 The user may open `.claude/workflow/plans/*.md` and edit it directly — add steps, reorder, mark `[?]`. The developer agent will pick up changes on the next `/wf-dev`. The plan is a contract that the user always controls.
 
+## Contributing improvements back to the workflow
+
+When the workflow is installed as a Git submodule, all internal files are editable in place — thanks to symlinks, changes to `.workflow/.claude/agents/wf-planner.md` affect your project immediately without copy-paste or restart. You can branch the submodule, make changes (agents, commands, hooks, skills), commit them, and submit a PR back upstream — all from your project — using `/wf-contribute`. See the README section "Contributing back upstream" for the full flow.
+
+This is the intended way to customize the workflow for your team: edit the agents/commands live in your project, test them in your active plan, commit to a branch, and PR them back. Once approved, the entire team gets the benefit via `git submodule update --remote`.
+
 ## Daily rhythm
 
 - Start: `/wf-morning` (loads yesterday's summary + active plan)

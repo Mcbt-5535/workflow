@@ -1,7 +1,9 @@
 # .claude/workflow/archive/
 
-Plans whose checklist is 100% done. Moved here from `.claude/workflow/plans/` by `/wf-evening`.
+已完成 100% 的计划。由 `/wf-evening` 从 `.claude/workflow/plans/` 移入此处。
 
-Kept around as a design-decision trail. You can grep them when you need to remember "why did we do X this way back in March?" — but they're never the active source of truth.
+作为设计决策的历史记录保存在这里。当你需要回忆"当时为什么这样做 X？"时，
+可以在这里 grep——但它们不是当前的信息来源。
 
-Cleanup: feel free to delete plans older than ~6 months if they're clutter. Git history holds the actual code changes.
+清理：超过约 6 个月的计划如果已成干扰，可以直接删除。
+实际代码变更的历史由 git 保存。

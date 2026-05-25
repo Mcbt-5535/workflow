@@ -1,107 +1,128 @@
-# Claude Code Workflow — installable, minimally invasive
+# Claude Code Workflow — 可安装、轻侵入
 
-A **Plan → Dev → Review** workflow for Claude Code that drops into any existing project
-with one folder + a few prefixed shim files. Saves tokens by routing planning/review to
-Opus and bulk implementation to Haiku.
+一个 **Plan → Dev → Review** 工作流，可以一键装入任何已有项目，
+只新增一个文件夹和少量带前缀的 shim 文件。
+通过把规划/审查路由到 Opus、把批量实现路由到 Haiku 来节省 token。
 
 ```
 🧠 /wf-plan (Opus)  →  ⚙️  /wf-dev (Haiku) × N  →  🔍 /wf-review (Opus)
 ```
 
-## Footprint on your project
+## 以 Git Submodule 方式安装（推荐）
 
-After installing into `~/myproject/`, **the only new top-level thing is nothing** — everything
-lives inside `.claude/`:
+最简单的安装方式。工作流在第一次启动 `claude` 时自动激活，无需运行任何安装脚本。
 
+1. **把 submodule 加入项目：**
+   ```bash
+   git submodule add https://github.com/anthropics/workflow .workflow
+   ```
+
+2. **初始化配置（仅一次）：**
+   ```bash
+   mkdir -p .claude
+   cp .workflow/.claude/workflow/auto-activate.snippet.json .claude/settings.json
+   # 若已有 settings 文件，用 jq 合并：
+   # jq -s '.[0] * .[1]' .claude/settings.json .workflow/.claude/workflow/auto-activate.snippet.json > /tmp/merged.json && mv /tmp/merged.json .claude/settings.json
+   ```
+
+3. **启动 Claude Code：**
+   ```bash
+   claude
+   ```
+   首次启动时工作流静默自动激活。submodule 路径默认为 `.workflow/`；
+   如需自定义（如 `vendor/workflow/`），设置 `WF_SUBMODULE_PATH=vendor/workflow` 后重启。
+
+## 以复制方式安装（备用）
+
+无法使用 Git submodule 时：
+```bash
+make -C <path-to-workflow-repo> install-copy TARGET=~/your-project
 ```
-~/myproject/
-├── (your existing files untouched)
-└── .claude/
-    ├── (your existing agents/commands/hooks/skills untouched)
-    ├── agents/wf-*.md              ← 3 prefixed files
-    ├── commands/wf-*.md            ← 9 prefixed files (/wf-plan, /wf-dev, …)
-    ├── hooks/wf-*.sh               ← 4 prefixed files
-    ├── skills/wf-workflow-intro/   ← 1 prefixed folder
-    ├── workflow/                   ← THE ONLY NEW NAMESPACE
-    │   ├── plans/                  ← active + completed plans
-    │   ├── summaries/              ← daily summaries + checkpoints
-    │   ├── archive/                ← done plans
-    │   ├── WORKFLOW.md             ← agent-facing rules
-    │   ├── README.md               ← human docs
-    │   ├── checkpoint.sh           ← 0-token emergency save (5h-limit safe)
-    │   ├── settings.snippet.json   ← merge guide
-    │   └── uninstall.sh
-    └── settings.json               ← MERGED, not overwritten
-```
+说明：复制所有 `wf-*` 文件和 `.claude/workflow/` 目录；需要 `jq` 自动合并 settings。
 
-To uninstall: `bash .claude/workflow/uninstall.sh` → removes everything.
-
-## Install
+## 卸载
 
 ```bash
-# From inside this template directory:
-bash install.sh ~/your-project
-
-# Re-run after updating to refresh:
-bash install.sh ~/your-project --force
+make -C .workflow uninstall                    # 标准卸载
+make -C .workflow uninstall ARGS=--clean-settings  # 同时清理 settings
 ```
 
-`install.sh` will:
-- Copy `wf-*` prefixed files into the canonical `.claude/{agents,commands,hooks,skills}/` locations (skipped if they exist; `--force` to overwrite).
-- Copy `.claude/workflow/` wholesale (data + docs + scripts).
-- Merge `settings.json` deep — adds the workflow's `hooks` and `permissions.allow` entries to your existing config (needs `jq`; falls back to printing the snippet for manual merge).
-- Print a one-line hint to optionally add `@.claude/workflow/WORKFLOW.md` to your project's CLAUDE.md.
+Submodule 完全移除：
+```bash
+git submodule deinit -f .workflow
+git rm -f .workflow
+git commit -m "Remove workflow submodule"
+```
 
-## Commands (all prefixed to avoid collisions)
+## 顶层 Make 目标速查表
 
-| Command | Role | Model |
+| Make 目标 | 作用 |
+|---|---|
+| `make install` | submodule 符号链接模式安装 |
+| `make install-copy TARGET=<dir>` | 复制模式安装 |
+| `make uninstall` | 卸载工作流 |
+| `make auto-activate` | 安全激活守卫（SessionStart hook 用） |
+| `make clean [ARGS=...]` | 清理 runtime 产物 |
+| `make checkpoint REASON='...'` | 0-token 紧急存档 |
+| `make contribute DESC='...'` | 创建上游贡献分支 |
+| `make contribute-push` | push 并开 PR |
+
+## Slash 命令一览
+
+| 命令 | 作用 | 模型 |
 |---|---|---|
-| `/wf-plan <task>` | Plan a task | Opus (planner subagent) |
-| `/wf-dev` | Execute next step | Haiku (developer subagent) |
-| `/wf-review` | Audit `git diff` | Opus (reviewer subagent) |
-| `/wf-morning` | Load yesterday's context | main session |
-| `/wf-evening` | Daily summary + tomorrow plan | main session |
-| `/wf-handoff` | Brief a human reviewer | main session |
-| `/wf-checkpoint <reason>` | Emergency save (uses tokens) | main session |
-| `/wf-status` | Show progress | main session |
-| `/wf-interrupt <change>` | Edit the active plan | main session |
+| `/wf-plan <任务>` | 规划任务 | Opus（planner subagent） |
+| `/wf-dev` | 执行下一步 | Haiku（developer subagent） |
+| `/wf-review` | 审查 `git diff` | Opus（reviewer subagent） |
+| `/wf-morning` | 加载昨日上下文 | 主对话 |
+| `/wf-evening` | 每日总结 + 规划明天 | 主对话 |
+| `/wf-handoff` | 为人工审查者做简报 | 主对话 |
+| `/wf-checkpoint <原因>` | 紧急存档（消耗 token） | 主对话 |
+| `/wf-status` | 查看进度 | 主对话 |
+| `/wf-interrupt <改动>` | 修改活跃计划 | 主对话 |
+| `/wf-contribute <描述>` | 为工作流创建贡献分支 | 主对话 |
 
-Plus pure-bash escape hatch (no tokens, works during 5h-limit):
+## 侵入范围
 
-```bash
-bash .claude/workflow/checkpoint.sh "ran out, picking up tomorrow"
+安装后，**顶层唯一新增的是 `.workflow/` submodule**。所有其他内容都在 `.claude/` 内部：
+
+```
+.claude/
+├── agents/wf-*.md                    # 3 个带前缀的 agent 定义
+├── commands/wf-*.md                  # 9 个 slash 命令
+├── hooks/wf-*.sh                     # 4 个事件 hook
+├── skills/wf-workflow-intro/         # 1 个 skill
+└── workflow/                         # 唯一新命名空间
+    ├── plans/                        # 活跃计划 + 已完成计划
+    ├── summaries/                    # 每日总结 + 检查点
+    ├── archive/                      # 已完成归档
+    ├── auto-activate.snippet.json    # settings 合并片段
+    ├── install.sh                    # submodule 安装脚本
+    ├── checkpoint.sh                 # 0-token 紧急存档
+    ├── WORKFLOW.md                   # agent 规则（AI 端）
+    ├── _lib.sh                       # 共享工具库
+    └── clean.sh                      # 清理脚本
 ```
 
-## Why this is minimally invasive
+卸载：`make -C .workflow uninstall` 删除所有内容。
 
-- **0 files at project root.** All new files are inside `.claude/`.
-- **Prefix `wf-`** on every file in canonical `.claude/` subdirs — clear ownership, zero collision with your existing agents/commands/hooks.
-- **One namespace `.claude/workflow/`** holds everything else (data, docs, scripts).
-- **settings.json merged, never overwritten.** Your existing hooks and permissions stay.
-- **Project's `CLAUDE.md` untouched.** Workflow has its own `WORKFLOW.md` inside its namespace; reference it from your CLAUDE.md if you want it always loaded, otherwise it's loaded contextually via slash commands and the skill description.
-- **Clean uninstall:** one script removes everything; optionally backs up plans/summaries first.
+## 贡献回上游
 
-## Full docs
+Submodule 安装后，可在项目内直接贡献改进：
 
-After installing, the project-facing docs live at:
-- `.claude/workflow/README.md` — full usage manual (Chinese + English)
-- `.claude/workflow/WORKFLOW.md` — agent-facing rules / behavior contract
+1. **创建贡献分支：**
+   ```bash
+   make contribute DESC="改进 planner 提示词"
+   ```
 
-This top-level README only covers installation. Everything else is in the namespace.
+2. **原地编辑并提交（符号链接自动同步）：**
+   ```bash
+   git -C .workflow commit -am "优化 planner 指令"
+   ```
 
-## Developing this repo
+3. **推送并开 PR：**
+   ```bash
+   make contribute-push
+   ```
 
-Runtime data under `.claude/workflow/{plans,summaries,archive}/` is gitignored in this repo so dogfooding doesn't pollute commits. Downstream projects should add the same patterns to their own `.gitignore` if they want the same behavior.
-
-## Standalone test
-
-You can also use this template directory itself as a working project to try the
-workflow before installing it elsewhere:
-
-```bash
-cd workflow/   # this directory
-claude
-/wf-plan add a CHANGELOG to this template
-/wf-dev
-/wf-review
-```
+详见 `make help`。
