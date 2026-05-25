@@ -1,0 +1,13 @@
+{
+  "_comment": "Copy into your .claude/settings.json to auto-activate the workflow on the next 'claude' startup. Requires the workflow submodule at .workflow/ (adjust the make -C path if your submodule lives elsewhere).",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          { "type": "command", "command": "make -C .workflow auto-activate" }
+        ]
+      }
+    ]
+  }
+}

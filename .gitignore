@@ -9,3 +9,8 @@
 
 # Per-machine configuration
 .claude/settings.local.json
+
+# Workflow activation state
+.claude/workflow/.activated
+.claude/workflow/.activation-error.log
+.claude/workflow/.activation-error.log.reported
