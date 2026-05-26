@@ -64,3 +64,4 @@ model_for_dev: haiku
 - Read at most 5 files during planning; if you need more, the plan is too broad.
 - Do not paste file contents into the plan — reference by path:line.
 - Keep the plan under ~150 lines. Detail belongs in the code, not the document.
+- The final output should be in Chinese.
