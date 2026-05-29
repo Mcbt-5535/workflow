@@ -1,13 +1,13 @@
 #!/bin/bash
-# contribute.sh — Branch the workflow submodule, prepare for editing, push PR upstream
-# Usage: contribute.sh <description> | --push
+# 工作流子模块分支创建、编辑准备、上游 PR 推送脚本
+# 用法: contribute.sh <description> | --push
 
 set -eu
 
-# Resolve parent repo root regardless of cwd
+# 无论当前工作目录如何，都解析父仓库根目录
 PARENT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
-# Detect submodule directory (returns absolute path)
+# 检测子模块目录（返回绝对路径）
 _detect_submodule_dir() {
     local env_override="${WF_SUBMODULE_PATH:-}"
     if [ -n "$env_override" ]; then
@@ -15,13 +15,13 @@ _detect_submodule_dir() {
         return 0
     fi
 
-    # Try .workflow first (most common)
+    # 首先尝试 .workflow（最常见的情况）
     if [ -d "$PARENT_ROOT/.workflow" ] && [ -d "$PARENT_ROOT/.workflow/.git" ]; then
         echo "$PARENT_ROOT/.workflow"
         return 0
     fi
 
-    # Scan .gitmodules for our repo's URL
+    # 在 .gitmodules 中扫描我们仓库的 URL
     if [ -f "$PARENT_ROOT/.gitmodules" ]; then
         local repo_url
         repo_url=$(cd "$PARENT_ROOT/.workflow" 2>/dev/null && git remote get-url origin 2>/dev/null || echo "")
@@ -34,25 +34,19 @@ _detect_submodule_dir() {
     return 1
 }
 
-# Resolve SUBMODULE_DIR (absolute path)
+# 解析 SUBMODULE_DIR（绝对路径）
 SUBMODULE_DIR=$(_detect_submodule_dir)
 
-# Require the submodule is a real git submodule (not just a directory)
+# 要求子模块是真正的 git 子模块（不仅仅是目录）
 if ! git -C "$SUBMODULE_DIR" rev-parse --show-toplevel >/dev/null 2>&1; then
     echo "Error: .workflow is not a git repository." >&2
     exit 1
 fi
 
-# Verify this is actually a submodule context (not the main repo)
-SUBMODULE_TOP=$(git -C "$SUBMODULE_DIR" rev-parse --show-toplevel)
-if ! git -C "$SUBMODULE_TOP" rev-parse --show-toplevel 2>/dev/null | grep -q "^$(git rev-parse --show-toplevel 2>/dev/null)$"; then
-    # If we get here, submodule is nested under parent repo — this is correct
-    :
-fi
 
 ACTION="${1:-}"
 
-# Check if submodule is clean (required before any branch operation)
+# 检查子模块是否干净（分支操作前必需）
 if ! git -C "$SUBMODULE_DIR" diff --quiet 2>/dev/null; then
     echo "Error: Workflow submodule has uncommitted changes:" >&2
     git -C "$SUBMODULE_DIR" status --short >&2
@@ -70,7 +64,7 @@ if ! git -C "$SUBMODULE_DIR" diff --cached --quiet 2>/dev/null; then
 fi
 
 if [ "$ACTION" = "--push" ]; then
-    # Push mode: verify commits exist on the branch
+    # 推送模式：验证分支上是否存在提交
     CURRENT_BRANCH=$(git -C "$SUBMODULE_DIR" rev-parse --abbrev-ref HEAD)
 
     if [ "$CURRENT_BRANCH" = "HEAD" ] || [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ]; then
@@ -78,39 +72,39 @@ if [ "$ACTION" = "--push" ]; then
         exit 1
     fi
 
-    # Fetch origin/main to ensure ref exists
+    # 获取 origin/main 以确保引用存在
     git -C "$SUBMODULE_DIR" fetch origin main 2>/dev/null || true
 
-    # Check if there are commits ahead of main
+    # 检查是否有分支领先 main 的提交
     if ! git -C "$SUBMODULE_DIR" rev-list origin/main.."$CURRENT_BRANCH" --count 2>/dev/null | grep -qv "^0$"; then
         echo "Error: No new commits on branch '$CURRENT_BRANCH'. Nothing to push." >&2
         echo "Make changes and commit them first." >&2
         exit 1
     fi
 
-    # Push to upstream with tracking
+    # 以跟踪方式推送到上游
     echo "Pushing branch '$CURRENT_BRANCH' to upstream..." >&2
     if ! git -C "$SUBMODULE_DIR" push -u origin "$CURRENT_BRANCH" 2>&1; then
         echo "Error: Failed to push branch." >&2
         exit 1
     fi
 
-    # Parse upstream remote to construct PR URL or use gh
+    # 解析上游远程仓库以构造 PR URL 或使用 gh
     REMOTE_URL=$(git -C "$SUBMODULE_DIR" remote get-url origin)
 
-    # Extract owner/repo from SSH (git@github.com:owner/repo.git) or HTTPS (https://github.com/owner/repo.git)
-    # Strip .git suffix if present
+    # 从 SSH（git@github.com:owner/repo.git）或 HTTPS（https://github.com/owner/repo.git）格式提取 owner/repo
+    # 如果存在则去掉 .git 后缀
     OWNER_REPO=""
     if [[ "$REMOTE_URL" =~ git@github\.com:([^/]+)/([^/]+?)(\.git)?$ ]]; then
         OWNER_REPO="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
     elif [[ "$REMOTE_URL" =~ https://github\.com/([^/]+)/([^/]+?)(\.git)?/?$ ]]; then
         OWNER_REPO="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
     fi
-    # Clean up .git suffix if it was captured
+    # 如果被捕获则清除 .git 后缀
     OWNER_REPO="${OWNER_REPO%.git}"
 
     if [ -z "$OWNER_REPO" ]; then
-        # Non-GitHub host
+        # 非 GitHub 主机
         echo "" >&2
         echo "Push complete! To open a pull request on your Git host, visit:" >&2
         echo "  Remote: $REMOTE_URL" >&2
@@ -118,7 +112,7 @@ if [ "$ACTION" = "--push" ]; then
         exit 0
     fi
 
-    # Try gh first
+    # 首先尝试使用 gh
     if command -v gh >/dev/null 2>&1; then
         echo "" >&2
         echo "Opening GitHub PR for branch '$CURRENT_BRANCH'..." >&2
@@ -131,14 +125,14 @@ if [ "$ACTION" = "--push" ]; then
             echo "PR created and opened in browser." >&2
             exit 0
         else
-            # Fallback to compare URL if gh fails
+            # 如果 gh 失败则回退到比较 URL
             echo "Could not create PR via gh. Opening compare URL instead..." >&2
             COMPARE_URL="https://github.com/$OWNER_REPO/compare/main...$CURRENT_BRANCH"
             echo "  $COMPARE_URL" >&2
             exit 0
         fi
     else
-        # No gh; print compare URL
+        # 没有 gh；打印比较 URL
         COMPARE_URL="https://github.com/$OWNER_REPO/compare/main...$CURRENT_BRANCH"
         echo "" >&2
         echo "gh command not found. Open your PR manually:" >&2
@@ -150,7 +144,7 @@ if [ "$ACTION" = "--push" ]; then
         exit 0
     fi
 else
-    # Branch mode: create a new contribution branch
+    # 分支模式：创建新的贡献分支
     if [ -z "$ACTION" ]; then
         echo "Usage: $0 <description> | --push" >&2
         echo "" >&2
@@ -162,13 +156,13 @@ else
 
     DESCRIPTION="$ACTION"
 
-    # Create branch name from description
-    # Format: contrib/YYYYMMDD-<slugified-description>
+    # 从描述创建分支名
+    # 格式: contrib/YYYYMMDD-<slugified-description>
     BRANCH_BASE="contrib/$(date +%Y%m%d)"
     BRANCH_SLUG=$(echo "$DESCRIPTION" | tr ' /' '--' | tr -cd 'a-zA-Z0-9-' | cut -c1-40)
     BRANCH_NAME="$BRANCH_BASE-$BRANCH_SLUG"
 
-    # Create or switch to branch
+    # 创建或切换到分支
     if git -C "$SUBMODULE_DIR" rev-parse --verify "$BRANCH_NAME" >/dev/null 2>&1; then
         echo "Branch '$BRANCH_NAME' already exists. Switching to it..." >&2
         git -C "$SUBMODULE_DIR" checkout "$BRANCH_NAME"

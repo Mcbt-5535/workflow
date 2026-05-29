@@ -14,6 +14,11 @@ help:
 
 install:
 	@bash .claude/workflow/install.sh symlink $(ARGS)
+	@echo ""
+	@echo "💡 Upgrade tip:"
+	@echo "  After submodule update (git submodule update --remote), re-run 'make install'"
+	@echo "  to overwrite symlinks. If .claude/ contains manually-created regular files,"
+	@echo "  use: make install ARGS=--force"
 
 install-copy:
 	@bash .claude/workflow/install.sh copy --target "$(TARGET)" $(ARGS)

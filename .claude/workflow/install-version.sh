@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# install-version.sh
 # 独立脚本：为目标项目安装版本号管理系统
 # 用途：将 version-bump.yml CI 脚本和 version_manager.py 工具集成到目标项目
 # 检测重复安装，避免覆盖已存在的 CI 配置
@@ -12,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # SCRIPT_DIR 是 .claude/workflow，向上两级到仓库根目录
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# 帮助文本
+# 显示帮助信息
 show_help() {
   cat <<EOF
 用法: bash install-version.sh [--target <target-dir>] [--force]
@@ -42,7 +41,7 @@ EOF
 
 FORCE=0
 
-# 参数解析
+# 命令行参数解析
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --target)
@@ -71,7 +70,7 @@ done
 
 # 默认目标：workflow submodule 上级的 git toplevel（与 install.sh 保持一致）
 if [[ -z "$TARGET" ]]; then
-  TARGET="$(git -C "$REPO_ROOT/.." rev-parse --show-toplevel 2>/dev/null || echo "$REPO_ROOT/..")"
+  TARGET="$(cd "$REPO_ROOT/.." && pwd)"
 fi
 
 # 规范化目标路径（如果不存在则创建）
@@ -89,12 +88,12 @@ VERSION_SCRIPT="$TARGET/scripts/python_scripts/version_manager.py"
 ANALYZE_SCRIPT="$TARGET/scripts/python_scripts/analyze_commits.py"
 VERSION_FILE="$TARGET/.version"
 
-# 源文件路径
+# 定义源文件路径
 SOURCE_CI="$SCRIPT_DIR/version-scripts/version-bump.yml"
 SOURCE_SCRIPT="$SCRIPT_DIR/version-scripts/version_manager.py"
 SOURCE_ANALYZE="$SCRIPT_DIR/version-scripts/analyze_commits.py"
 
-# 检查源文件是否存在
+# 验证源文件是否存在
 if [[ ! -f "$SOURCE_CI" ]]; then
   echo "错误: 源文件不存在: $SOURCE_CI" >&2
   exit 1
@@ -110,7 +109,7 @@ if [[ ! -f "$SOURCE_ANALYZE" ]]; then
   exit 1
 fi
 
-# 重复安装检测
+# 防止重复安装
 if [[ -f "$CI_FILE" ]] && [[ "$FORCE" != "1" ]]; then
   echo "已安装：${CI_FILE} 已存在。如需重新安装，请使用 --force 或手动删除该文件后重试。" >&2
   exit 1
@@ -120,10 +119,10 @@ fi
 mkdir -p "$TARGET/.github/workflows"
 mkdir -p "$TARGET/scripts/python_scripts"
 
-# 复制 CI 文件
+# 复制 CI 工作流文件
 cp "$SOURCE_CI" "$CI_FILE"
 
-# 复制版本管理脚本和依赖分析脚本
+# 复制版本管理脚本和提交分析脚本
 cp "$SOURCE_SCRIPT" "$VERSION_SCRIPT"
 chmod +x "$VERSION_SCRIPT"
 
@@ -135,7 +134,7 @@ if [[ ! -f "$VERSION_FILE" ]]; then
   echo '{"version": "0.0.1"}' > "$VERSION_FILE"
 fi
 
-# 成功提示
+# 显示安装成功提示
 echo "✓ 版本管理系统已成功安装到: $TARGET"
 echo "  - CI 脚本: .github/workflows/version-bump.yml"
 echo "  - 版本管理工具: scripts/python_scripts/version_manager.py"

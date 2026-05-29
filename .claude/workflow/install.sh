@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Unified install / uninstall / auto-activate.
-# Subcommands:
+# 统一安装/卸载/自动激活脚本
+# 子命令:
 #   install.sh symlink       [--target <dir>] [--force] [--quiet]
 #   install.sh copy          --target <dir> [--force]
 #   install.sh uninstall     [--target <dir>] [--clean-settings] [--force]
@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SUBMODULE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$SCRIPT_DIR/_lib.sh"
 
-# --- Globals ---
+# --- 全局变量 ---
 TARGET=""
 FORCE=0
 QUIET=0
@@ -21,11 +21,11 @@ NO_SYMLINK=0
 CLEAN_SETTINGS=0
 ALL=0
 
-# Default whitelist: commands and agents to install without --all flag
+# 默认白名单：不使用 --all 标志时要安装的命令和代理
 DEFAULT_COMMANDS=("wf-plan" "wf-dev" "wf-interrupt" "wf-review" "wf-commit")
 DEFAULT_AGENTS=("wf-planner" "wf-developer" "wf-reviewer" "wf-commit")
 
-# Check if a name is in whitelist (array passed by name)
+# 检查名称是否在白名单中（通过名称传递数组）
 _in_list() {
   local needle="$1" array_name="$2"
   local -n arr="$array_name"
@@ -65,7 +65,7 @@ Usage:
 
 Subcommands:
   symlink       Install workflow as symlinks (submodule mode).
-                Default target = git toplevel containing the submodule.
+                Default target = submodule parent project directory.
   copy          Copy workflow files into <dir> (no submodule).
                 --all Install all commands; default installs only wf-plan, wf-dev,
                       wf-interrupt, wf-review, wf-commit and dependencies.
@@ -76,17 +76,17 @@ Subcommands:
 EOF
 }
 
-# Resolve target (parent project root)
+# 解析目标（父项目根目录）
 _resolve_target_for_install() {
   if [ -n "$TARGET" ]; then
     TARGET="$(cd "$TARGET" 2>/dev/null && pwd || echo "$TARGET")"
   else
-    TARGET="$(git -C "$SUBMODULE_DIR/.." rev-parse --show-toplevel 2>/dev/null || echo "$SUBMODULE_DIR/..")"
+    TARGET="$SUBMODULE_DIR/.."
     TARGET="$(cd "$TARGET" 2>/dev/null && pwd || echo "$TARGET")"
   fi
 }
 
-# Symlink one source file to target path; returns 0 if linked, 2 if skipped.
+# 将一个源文件符号链接到目标路径；如果链接成功返回 0，跳过返回 2
 _symlink_file() {
   local source_file="$1"
   local target_path="$2"
@@ -108,7 +108,7 @@ _symlink_file() {
   return 0
 }
 
-# Ensure real state directory exists, seeded with README if available.
+# 确保真实状态目录存在，如果有 README 则用其初始化
 _ensure_real_dir() {
   local dir="$1"
   if [ ! -d "$dir" ]; then
@@ -118,7 +118,7 @@ _ensure_real_dir() {
   fi
 }
 
-# Copy one file (used by `copy` subcommand)
+# 复制一个文件（由 `copy` 子命令使用）
 _copy_file() {
   local src="$1" dst="$2"
   mkdir -p "$(dirname "$dst")"
@@ -130,7 +130,7 @@ _copy_file() {
   echo "  ✓ $dst"
 }
 
-# --- symlink subcommand ---
+# --- symlink 子命令 ---
 cmd_symlink() {
   _resolve_target_for_install
 
@@ -151,7 +151,7 @@ EOF
   local links_created=0
   local links_skipped=0
 
-  # Agents / commands / hooks
+  # 代理 / 命令 / 钩子
   for kind in agents commands hooks; do
     for f in "$SUBMODULE_DIR/.claude/$kind/"wf-*.*; do
       [ -f "$f" ] || continue
@@ -159,7 +159,7 @@ EOF
       name="$(basename "$f")"
       component_name="${name%.*}"
 
-      # Apply whitelist filter to agents and commands, but skip for hooks
+      # 对代理和命令应用白名单过滤，但跳过钩子
       if [ "$kind" != "hooks" ]; then
         local whitelist_var="DEFAULT_${kind^^}"
         if [ "$ALL" != "1" ] && ! _in_list "$component_name" "$whitelist_var"; then
@@ -176,7 +176,7 @@ EOF
     done
   done
 
-  # Skill directory (symlinked as a whole dir)
+  # 技能目录（作为整体目录符号链接）
   if [ -d "$SUBMODULE_DIR/.claude/skills/wf-workflow-intro" ]; then
     local skill_target skill_dir rel
     skill_target="$TARGET/.claude/skills/wf-workflow-intro"
@@ -201,12 +201,12 @@ EOF
     fi
   fi
 
-  # Real state dirs
+  # 真实状态目录
   _ensure_real_dir "$TARGET/.claude/workflow/plans"
   _ensure_real_dir "$TARGET/.claude/workflow/summaries"
   _ensure_real_dir "$TARGET/.claude/workflow/archive"
 
-  # Symlink workflow support files
+  # 符号链接工作流支持文件
   for f in WORKFLOW.md checkpoint.sh clean.sh contribute.sh settings.snippet.json auto-activate.snippet.json _lib.sh; do
     local src="$SUBMODULE_DIR/.claude/workflow/$f"
     local dst="$TARGET/.claude/workflow/$f"
@@ -218,7 +218,7 @@ EOF
     fi
   done
 
-  # Settings merge
+  # 设置合并
   local target_settings="$TARGET/.claude/settings.json"
   local snippet="$SUBMODULE_DIR/.claude/workflow/settings.snippet.json"
   local merge_status="merged"
@@ -232,7 +232,7 @@ EOF
     cp "$snippet" "$target_settings"
   fi
 
-  # Activation sentinel
+  # 激活哨兵
   local sha timestamp
   sha="$(git -C "$SUBMODULE_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")"
   timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -258,7 +258,7 @@ EOF
   fi
 }
 
-# --- copy subcommand ---
+# --- copy 子命令 ---
 cmd_copy() {
   if [ -z "$TARGET" ]; then
     echo "Usage: install.sh copy --target <dir> [--force]" >&2
@@ -348,7 +348,7 @@ cmd_copy() {
   echo "  bash $TARGET/.claude/workflow/install.sh uninstall --target $TARGET"
 }
 
-# --- uninstall subcommand ---
+# --- uninstall 子命令 ---
 cmd_uninstall() {
   _resolve_target_for_install
 
@@ -357,6 +357,7 @@ cmd_uninstall() {
   local skipped=0
 
   _remove_one() {
+    # 移除一个文件或符号链接
     local path="$1"
     if [ -L "$path" ]; then
       rm -f "$path"
@@ -401,6 +402,7 @@ cmd_uninstall() {
   shopt -u nullglob
 
   if [ "$CLEAN_SETTINGS" = "1" ]; then
+    # 从 settings.json 中清除 wf-* 钩子条目
     local target_settings="$TARGET/.claude/settings.json"
     if [ -f "$target_settings" ] && command -v jq >/dev/null 2>&1; then
       jq '
@@ -439,8 +441,9 @@ cmd_uninstall() {
   echo ""
 }
 
-# --- auto-activate subcommand ---
+# --- auto-activate 子命令 ---
 _is_correct_symlink() {
+  # 检查符号链接是否指向正确的子模块目录
   local link_path="$1"
   local submodule_dir="$2"
   [ -L "$link_path" ] || return 1
@@ -450,6 +453,7 @@ _is_correct_symlink() {
 }
 
 _collect_conflicts() {
+  # 收集冲突（不是指向正确子模块的符号链接）
   local target="$1" submodule="$2"
   local -n out=$3
   local f
@@ -466,7 +470,7 @@ _collect_conflicts() {
 }
 
 cmd_auto_activate() {
-  # Detect submodule dir (relative path string, not absolute)
+  # 检测子模块目录（相对路径字符串，非绝对路径）
   local submodule_rel=""
   if [ -n "${WF_SUBMODULE_PATH:-}" ]; then
     submodule_rel="$WF_SUBMODULE_PATH"
@@ -477,25 +481,21 @@ cmd_auto_activate() {
   elif [ -d ".workflow" ]; then
     submodule_rel=".workflow"
   else
-    # No submodule context — silent exit
+    # 没有子模块上下文 — 静默退出
     return 0
   fi
 
   local target
-  if target="$(git rev-parse --show-toplevel 2>/dev/null)"; then
-    :
-  else
-    target="$(pwd)"
-  fi
+  target="$(cd "$SUBMODULE_DIR/.." 2>/dev/null && pwd || echo "$SUBMODULE_DIR/..")"
 
   local submodule_abs
-  submodule_abs="$(cd "$target/$submodule_rel" 2>/dev/null && pwd || echo "$target/$submodule_rel")"
+  submodule_abs="$SUBMODULE_DIR"
 
   local sentinel="$target/.claude/workflow/.activated"
   local snippet="$submodule_abs/.claude/workflow/settings.snippet.json"
   local error_log="$target/.claude/workflow/.activation-error.log"
 
-  # Sentinel check
+  # 检查哨兵
   if [ -f "$sentinel" ]; then
     local recorded current
     recorded="$(grep '^SHA: ' "$sentinel" | cut -d' ' -f2- || echo "")"
@@ -505,7 +505,7 @@ cmd_auto_activate() {
     fi
   fi
 
-  # Conflict detection
+  # 冲突检测
   local conflicts=()
   _collect_conflicts "$target" "$submodule_abs" conflicts
   if [ ${#conflicts[@]} -gt 0 ]; then
@@ -526,7 +526,7 @@ EOF
     return 1
   fi
 
-  # Settings merge safety
+  # 设置合并安全性检查
   local target_settings="$target/.claude/settings.json"
   if [ -f "$target_settings" ]; then
     if ! wf_merge_settings "$target_settings" "$snippet" --dry-run >/dev/null 2>&1; then
@@ -541,7 +541,7 @@ EOF
     fi
   fi
 
-  # Run install (symlink, quiet)
+  # 运行安装（符号链接，静默模式）
   mkdir -p "$target/.claude/workflow"
   if bash "$submodule_abs/.claude/workflow/install.sh" symlink --quiet --target "$target" 2>"$error_log"; then
     rm -f "$error_log"
@@ -555,7 +555,7 @@ EOF
   fi
 }
 
-# --- Argument parsing ---
+# --- 参数解析 ---
 if [ $# -eq 0 ]; then
   _show_help
   exit 1
@@ -581,7 +581,7 @@ while [ $# -gt 0 ]; do
     --) shift; break ;;
     -*) echo "Unknown flag: $1" >&2; _show_help >&2; exit 1 ;;
     *)
-      # Positional target (back-compat)
+      # 位置参数目标（后向兼容）
       if [ -z "$TARGET" ]; then
         TARGET="$1"; shift
       else
