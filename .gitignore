@@ -14,3 +14,4 @@
 .claude/workflow/.activated
 .claude/workflow/.activation-error.log
 .claude/workflow/.activation-error.log.reported
+temp/*

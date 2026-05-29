@@ -1,4 +1,4 @@
-.PHONY: help install install-copy uninstall auto-activate clean checkpoint contribute contribute-push
+.PHONY: help install install-copy install-version uninstall auto-activate clean checkpoint contribute contribute-push
 
 help:
 	@echo "Workflow targets:"
@@ -16,6 +16,9 @@ install:
 
 install-copy:
 	@bash .claude/workflow/install.sh copy --target "$(TARGET)" $(ARGS)
+
+install-version:
+	@bash .claude/workflow/install-version.sh --target "$(TARGET)"
 
 uninstall:
 	@bash .claude/workflow/install.sh uninstall $(ARGS)

@@ -1,0 +1,87 @@
+name: Auto-increment Version on Push to Main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    # 并发防护：同一时间只允许一个版本更新任务运行，避免 git push 非快进冲突
+    concurrency:
+      group: version-bump
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Configure Git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Determine version bump type from all commits
+        id: version_bump
+        run: |
+          # Use the analyze_commits.py script to analyze all commits since the last tag
+          BUMP_TYPE=$(python scripts/python_scripts/analyze_commits.py analyze)
+          echo "Bump type: $BUMP_TYPE"
+          echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
+
+      - name: Get current version
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(python scripts/python_scripts/version_manager.py get)
+          echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
+
+      - name: Increment version based on commit analysis
+        id: bump_version
+        run: |
+          NEW_VERSION=$(python scripts/python_scripts/version_manager.py $BUMP_TYPE)
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Create and push version commit
+        run: |
+          git add .
+          git commit -m "chore: bump version from ${{ env.CURRENT_VERSION }} to ${{ env.NEW_VERSION }} [skip ci]" || echo "No changes to commit"
+          # 推送前 rebase 远端最新提交，防止非快进推送失败
+          git pull --rebase origin main
+          git push origin main
+
+      # 只在major或minor变化时创建标签
+      - name: Create Git tag for major/minor versions
+        if: env.BUMP_TYPE == 'major' || env.BUMP_TYPE == 'minor'
+        run: |
+          # 幂等创建标签：仅当 tag 不存在时才创建，绝不使用 -f 覆盖历史发布
+          git rev-parse -q --verify "refs/tags/v${{ env.NEW_VERSION }}" || git tag "v${{ env.NEW_VERSION }}"
+          # 推送 tag；若远端已存在同名 tag 且指向不同 commit，推送会显式失败（而非静默覆盖），这是预期行为
+          git push origin "v${{ env.NEW_VERSION }}"
+          echo "Created and pushed tag v${{ env.NEW_VERSION }} for ${{ env.BUMP_TYPE }} version bump"
+                # - name: Create GitHub Release
+      # - name: Create GitHub Release
+      #   uses: actions/create-release@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     tag_name: v${{ env.NEW_VERSION }}
+      #     release_name: Release v${{ env.NEW_VERSION }}
+      #     body: |
+      #       Release version ${{ env.NEW_VERSION }}
+            
+      #       Version bump triggered by commits since last release:
+      #       $(git log $(git describe --tags --abbrev=0 2^1) HEAD --oneline --pretty=format:"- %s (%an)" || echo "Initial release")
+      #     draft: false
+      #     prerelease: false

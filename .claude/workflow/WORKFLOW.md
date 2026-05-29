@@ -1,12 +1,13 @@
 # Project: workflow system
 
-This project uses a 3-agent Plan → Dev → Review workflow to balance quality with token cost.
+This project uses a 4-agent Plan → Dev → Review → Commit workflow to balance quality with token cost.
 
 ## Roles
 
 - **Planner (Opus)** — invoked via `/wf-plan <task>`. Writes a step-by-step plan to `.claude/workflow/plans/YYYY-MM-DD-<slug>.md`.
 - **Developer (Haiku)** — invoked via `/wf-dev`. Reads the active plan, executes one unchecked step, marks it done.
 - **Reviewer (Opus)** — invoked via `/wf-review`. Reads `git diff`, audits against the plan.
+- **Commit (wf-commit)** — invoked via `/wf-commit`. Analyzes staged changes and generates a commit draft (conventional-commit message) for the user to review and confirm.
 
 Heavy thinking happens twice (plan + review). Bulk implementation runs on the cheap model.
 
@@ -15,7 +16,7 @@ Heavy thinking happens twice (plan + review). Bulk implementation runs on the ch
 - `.claude/workflow/plans/` — active and recently-completed plans. Markdown with frontmatter (`status: in_progress | done`).
 - `.claude/workflow/summaries/` — one file per day. Written by `/wf-evening`, read by `/wf-morning`.
 - `.claude/workflow/archive/` — plans whose checklist is 100% done. Moved here by `/wf-evening`.
-- `.claude/agents/` — the three subagent definitions.
+- `.claude/agents/` — the four subagent definitions (planner, developer, reviewer, commit).
 - `.claude/commands/` — slash commands that orchestrate.
 - `.claude/hooks/` — session-start + stop hooks (load context, evening nudge).
 
@@ -75,6 +76,28 @@ If the user hits the rolling 5-hour limit:
 - The user should run **`bash checkpoint.sh "<reason>"`** from a terminal — pure bash, no tokens. State is preserved.
 - On resume, the user runs `claude` again; the SessionStart hook surfaces the active plan path + progress automatically.
 - If the limit hit mid-`/wf-dev`, the step may be partial: code changed but checkbox still `[ ]`. The checkpoint file's "⚠️ Possible mid-step state" section explains how to decide between continuing vs. `git checkout --`.
+
+## Version management system (optional)
+
+The workflow ships with an optional, standalone version management system (`install-version.sh`). This system is **completely separate** from the wf agent/command/hook architecture and can be installed independently:
+
+```bash
+bash .claude/workflow/install-version.sh --target <project-root>
+```
+
+or via Make:
+
+```bash
+make install-version TARGET=<project-root>
+```
+
+This installs:
+- `.github/workflows/version-bump.yml` — GitHub Actions CI for automatic version bumping
+- `scripts/python_scripts/version_manager.py` — CLI tool for version management
+- `scripts/python_scripts/analyze_commits.py` — commit analysis script
+- `.version` — initial version file (created if missing)
+
+The installer includes duplicate-install protection and creates target directories as needed. After installation, pushing to the main branch will trigger the CI to automatically bump the version based on commit analysis.
 
 ## Hard rules for the main agent
 

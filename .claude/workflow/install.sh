@@ -19,6 +19,38 @@ FORCE=0
 QUIET=0
 NO_SYMLINK=0
 CLEAN_SETTINGS=0
+ALL=0
+
+# Default whitelist: commands and agents to install without --all flag
+DEFAULT_COMMANDS=("wf-plan" "wf-dev" "wf-interrupt" "wf-review" "wf-commit")
+DEFAULT_AGENTS=("wf-planner" "wf-developer" "wf-reviewer" "wf-commit")
+
+# Check if a name is in whitelist (array passed by name)
+_in_list() {
+  local needle="$1" array_name="$2"
+  local -n arr="$array_name"
+  for item in "${arr[@]}"; do
+    [ "$item" = "$needle" ] && return 0
+  done
+  return 1
+}
+
+# 按白名单拷贝某类组件（agents/commands），消除 copy 路径下的重复循环
+# $1: 组件类型目录名（agents 或 commands）
+# $2: 对应白名单数组名（如 DEFAULT_AGENTS / DEFAULT_COMMANDS）
+_copy_filtered() {
+  local kind="$1" whitelist_var="$2"
+  local f basename_f component_name
+  for f in "$SUBMODULE_DIR/.claude/${kind}/"wf-*.md; do
+    if [ -f "$f" ]; then
+      basename_f="$(basename "$f")"
+      component_name="${basename_f%.md}"
+      if [ "$ALL" = "1" ] || _in_list "$component_name" "$whitelist_var"; then
+        _copy_file "$f" "$TARGET/.claude/${kind}/$basename_f"
+      fi
+    fi
+  done
+}
 
 _show_help() {
   cat <<'EOF'
@@ -26,7 +58,7 @@ Workflow install/uninstall.
 
 Usage:
   install.sh symlink       [--target <dir>] [--force] [--quiet]
-  install.sh copy          --target <dir> [--force]
+  install.sh copy          --target <dir> [--force] [--all]
   install.sh uninstall     [--target <dir>] [--clean-settings] [--force]
   install.sh auto-activate
   install.sh -h | --help
@@ -35,6 +67,8 @@ Subcommands:
   symlink       Install workflow as symlinks (submodule mode).
                 Default target = git toplevel containing the submodule.
   copy          Copy workflow files into <dir> (no submodule).
+                --all Install all commands; default installs only wf-plan, wf-dev,
+                      wf-interrupt, wf-review, wf-commit and dependencies.
   uninstall     Remove workflow files / symlinks from target.
                 --clean-settings strips wf-* hook entries from settings.json.
                 --force also removes regular files (not just symlinks).
@@ -121,8 +155,18 @@ EOF
   for kind in agents commands hooks; do
     for f in "$SUBMODULE_DIR/.claude/$kind/"wf-*.*; do
       [ -f "$f" ] || continue
-      local name target_link
+      local name target_link component_name
       name="$(basename "$f")"
+      component_name="${name%.*}"
+
+      # Apply whitelist filter to agents and commands, but skip for hooks
+      if [ "$kind" != "hooks" ]; then
+        local whitelist_var="DEFAULT_${kind^^}"
+        if [ "$ALL" != "1" ] && ! _in_list "$component_name" "$whitelist_var"; then
+          continue
+        fi
+      fi
+
       target_link="$TARGET/.claude/$kind/$name"
       if _symlink_file "$f" "$target_link"; then
         links_created=$((links_created + 1))
@@ -234,14 +278,10 @@ cmd_copy() {
   echo ""
 
   echo "▸ Copying agents…"
-  for f in "$SUBMODULE_DIR/.claude/agents/"wf-*.md; do
-    [ -f "$f" ] && _copy_file "$f" "$TARGET/.claude/agents/$(basename "$f")"
-  done
+  _copy_filtered agents DEFAULT_AGENTS
 
   echo "▸ Copying slash commands…"
-  for f in "$SUBMODULE_DIR/.claude/commands/"wf-*.md; do
-    [ -f "$f" ] && _copy_file "$f" "$TARGET/.claude/commands/$(basename "$f")"
-  done
+  _copy_filtered commands DEFAULT_COMMANDS
 
   echo "▸ Copying hooks…"
   for f in "$SUBMODULE_DIR/.claude/hooks/"wf-*.sh; do
@@ -534,6 +574,7 @@ while [ $# -gt 0 ]; do
     --target=*) TARGET="${1#--target=}"; shift ;;
     --force) FORCE=1; shift ;;
     --quiet) QUIET=1; shift ;;
+    --all) ALL=1; shift ;;
     --no-symlink) NO_SYMLINK=1; shift ;;
     --clean-settings) CLEAN_SETTINGS=1; shift ;;
     -h|--help) _show_help; exit 0 ;;

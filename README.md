@@ -40,6 +40,24 @@ make -C <path-to-workflow-repo> install-copy TARGET=~/your-project
 ```
 说明：复制所有 `wf-*` 文件和 `.claude/workflow/` 目录；需要 `jq` 自动合并 settings。
 
+## 版本管理系统（可选）
+
+工作流支持可选的自动版本号管理系统。安装方式：
+
+```bash
+bash .claude/workflow/install-version.sh --target $(pwd)
+# 或者通过 make 目标
+make -C .workflow install-version TARGET=$(pwd)
+```
+
+此脚本在目标项目中安装：
+- `.github/workflows/version-bump.yml` — 自动版本增量 CI 脚本
+- `scripts/python_scripts/version_manager.py` — 版本管理命令行工具
+- `scripts/python_scripts/analyze_commits.py` — 提交分析脚本
+- `.version` — 初始版本文件（若不存在）
+
+版本管理系统与 wf 工作流完全独立，不包含在默认安装中。重复安装时脚本会检测到已存在的配置并拒绝覆盖。
+
 ## 卸载
 
 ```bash
@@ -59,7 +77,10 @@ git commit -m "Remove workflow submodule"
 | Make 目标 | 作用 |
 |---|---|
 | `make install` | submodule 符号链接模式安装 |
-| `make install-copy TARGET=<dir>` | 复制模式安装 |
+| `make install ARGS=--no-symlink` | submodule 模式下改用复制模式安装（适用于无法创建符号链接的环境，如部分 Windows 或网络文件系统） |
+| `make install-copy TARGET=<dir>` | 复制模式安装（默认 5 个命令） |
+| `make install-copy TARGET=<dir> ARGS=--all` | 复制模式安装（全部命令） |
+| `make install-version TARGET=<dir>` | 安装可选版本管理系统 |
 | `make uninstall` | 卸载工作流 |
 | `make auto-activate` | 安全激活守卫（SessionStart hook 用） |
 | `make clean [ARGS=...]` | 清理 runtime 产物 |
@@ -69,17 +90,26 @@ git commit -m "Remove workflow submodule"
 
 ## Slash 命令一览
 
+### 默认安装（5 个）
+
 | 命令 | 作用 | 模型 |
 |---|---|---|
 | `/wf-plan <任务>` | 规划任务 | Opus（planner subagent） |
 | `/wf-dev` | 执行下一步 | Haiku（developer subagent） |
 | `/wf-review` | 审查 `git diff` | Opus（reviewer subagent） |
+| `/wf-interrupt <改动>` | 修改活跃计划 | 主对话 |
+| `/wf-commit` | 生成 commit 草稿 | 主对话 |
+
+### 可选（--all 时安装）
+
+| 命令 | 作用 | 模型 |
+|---|---|---|
 | `/wf-morning` | 加载昨日上下文 | 主对话 |
 | `/wf-evening` | 每日总结 + 规划明天 | 主对话 |
 | `/wf-handoff` | 为人工审查者做简报 | 主对话 |
 | `/wf-checkpoint <原因>` | 紧急存档（消耗 token） | 主对话 |
 | `/wf-status` | 查看进度 | 主对话 |
-| `/wf-interrupt <改动>` | 修改活跃计划 | 主对话 |
+| `/wf-clean` | 清理运行产物 | 主对话 |
 | `/wf-contribute <描述>` | 为工作流创建贡献分支 | 主对话 |
 
 ## 侵入范围
@@ -88,8 +118,8 @@ git commit -m "Remove workflow submodule"
 
 ```
 .claude/
-├── agents/wf-*.md                    # 3 个带前缀的 agent 定义
-├── commands/wf-*.md                  # 9 个 slash 命令
+├── agents/wf-*.md                    # 4 个带前缀的 agent 定义
+├── commands/wf-*.md                  # 默认 5 个，--all 时 12 个 slash 命令
 ├── hooks/wf-*.sh                     # 4 个事件 hook
 ├── skills/wf-workflow-intro/         # 1 个 skill
 └── workflow/                         # 唯一新命名空间
@@ -98,10 +128,15 @@ git commit -m "Remove workflow submodule"
     ├── archive/                      # 已完成归档
     ├── auto-activate.snippet.json    # settings 合并片段
     ├── install.sh                    # submodule 安装脚本
+    ├── install-version.sh            # 版本管理系统独立安装脚本
     ├── checkpoint.sh                 # 0-token 紧急存档
     ├── WORKFLOW.md                   # agent 规则（AI 端）
     ├── _lib.sh                       # 共享工具库
-    └── clean.sh                      # 清理脚本
+    ├── clean.sh                      # 清理脚本
+    └── version-scripts/              # 版本管理系统脚本（可选）
+        ├── version_manager.py        # 版本管理 CLI
+        ├── analyze_commits.py        # 提交分析脚本
+        └── version-bump.yml          # GitHub Actions 模板
 ```
 
 卸载：`make -C .workflow uninstall` 删除所有内容。
