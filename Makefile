@@ -4,6 +4,7 @@ help:
 	@echo "Workflow targets:"
 	@echo "  make install                    Symlink workflow into parent project (submodule mode)"
 	@echo "  make install-copy TARGET=<dir>  Copy workflow into <dir> (no submodule)"
+	@echo "  make install-version [ARGS=...] Install version management system into parent project"
 	@echo "  make uninstall                  Remove workflow from parent project"
 	@echo "  make auto-activate              Safe activation guard (used by SessionStart hook)"
 	@echo "  make clean [ARGS=...]           Audit + clean workflow runtime artifacts"
@@ -18,7 +19,7 @@ install-copy:
 	@bash .claude/workflow/install.sh copy --target "$(TARGET)" $(ARGS)
 
 install-version:
-	@bash .claude/workflow/install-version.sh --target "$(TARGET)"
+	@bash .claude/workflow/install-version.sh $(ARGS)
 
 uninstall:
 	@bash .claude/workflow/install.sh uninstall $(ARGS)

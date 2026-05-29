@@ -15,10 +15,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # 帮助文本
 show_help() {
   cat <<EOF
-用法: bash install-version.sh --target <target-dir>
+用法: bash install-version.sh [--target <target-dir>] [--force]
 
 选项:
-  --target <dir>    指定目标项目根目录（必需）
+  --target <dir>    指定目标项目根目录（默认：workflow submodule 的上级 git 根目录）
+  --force           强制覆盖已存在的 CI 配置文件
   --help            显示帮助信息
 
 描述:
@@ -28,14 +29,18 @@ show_help() {
   - 创建/更新 scripts/python_scripts/analyze_commits.py（提交分析工具）
   - 自动创建 .version 文件（如果不存在）
 
+  默认目标为 workflow submodule 上级项目根目录（与 make install 行为一致）。
   如果 .github/workflows/version-bump.yml 已存在，脚本将拒绝安装并退出，
-  以避免覆盖现有配置。可手动删除该文件后重新运行。
+  除非指定 --force。
 
 示例:
-  bash install-version.sh --target ~/my-project
-  bash install-version.sh --target /path/to/project
+  bash install-version.sh                          # 安装到上级项目
+  bash install-version.sh --target ~/my-project    # 安装到指定目录
+  bash install-version.sh --force                  # 强制覆盖已有配置
 EOF
 }
+
+FORCE=0
 
 # 参数解析
 while [[ $# -gt 0 ]]; do
@@ -43,6 +48,14 @@ while [[ $# -gt 0 ]]; do
     --target)
       TARGET="$2"
       shift 2
+      ;;
+    --target=*)
+      TARGET="${1#--target=}"
+      shift
+      ;;
+    --force)
+      FORCE=1
+      shift
       ;;
     --help)
       show_help
@@ -56,11 +69,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# 验证必需参数
+# 默认目标：workflow submodule 上级的 git toplevel（与 install.sh 保持一致）
 if [[ -z "$TARGET" ]]; then
-  echo "错误: --target 参数必需" >&2
-  show_help
-  exit 1
+  TARGET="$(git -C "$REPO_ROOT/.." rev-parse --show-toplevel 2>/dev/null || echo "$REPO_ROOT/..")"
 fi
 
 # 规范化目标路径（如果不存在则创建）
@@ -100,8 +111,8 @@ if [[ ! -f "$SOURCE_ANALYZE" ]]; then
 fi
 
 # 重复安装检测
-if [[ -f "$CI_FILE" ]]; then
-  echo "已安装：${CI_FILE} 已存在。如需重新安装，请先手动删除该文件后重试。" >&2
+if [[ -f "$CI_FILE" ]] && [[ "$FORCE" != "1" ]]; then
+  echo "已安装：${CI_FILE} 已存在。如需重新安装，请使用 --force 或手动删除该文件后重试。" >&2
   exit 1
 fi
 
