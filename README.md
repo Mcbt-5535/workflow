@@ -52,8 +52,8 @@ make -C .workflow install-version TARGET=$(pwd)
 
 此脚本在目标项目中安装：
 - `.github/workflows/version-bump.yml` — 自动版本增量 CI 脚本
-- `scripts/python_scripts/version_manager.py` — 版本管理命令行工具
-- `scripts/python_scripts/analyze_commits.py` — 提交分析脚本
+- `.github/scripts/version_manager.py` — 版本管理命令行工具
+- `.github/scripts/analyze_commits.py` — 提交分析脚本
 - `.version` — 初始版本文件（若不存在）
 
 版本管理系统与 wf 工作流完全独立，不包含在默认安装中。重复安装时脚本会检测到已存在的配置并拒绝覆盖。
