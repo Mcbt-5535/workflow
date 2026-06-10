@@ -1,163 +1,78 @@
-# Claude Code Workflow — 可安装、轻侵入
+# Claude Code Workflow
 
-一个 **Plan → Dev → Review** 工作流，可以一键装入任何已有项目，
-只新增一个文件夹和少量带前缀的 shim 文件。
-通过把规划/审查路由到 Opus、把批量实现路由到 Haiku 来节省 token。
+一个 **Plan → Dev → Review** 工作流，把规划/审查路由到 Opus、把批量实现路由到 Haiku，节省 token。
 
 ```
-🧠 /wf-plan (Opus)  →  ⚙️  /wf-dev (Haiku) × N  →  🔍 /wf-review (Opus)
+🧠 /wf-plan (Opus)  →  ⚙️ /wf-dev (Haiku) × N  →  🔍 /wf-review (Opus)
 ```
 
-## 以 Git Submodule 方式安装（推荐）
+## 安装
 
-最简单的安装方式。工作流在第一次启动 `claude` 时自动激活，无需运行任何安装脚本。
-
-1. **把 submodule 加入项目：**
-   ```bash
-   git submodule add https://github.com/anthropics/workflow .workflow
-   ```
-
-2. **初始化配置（仅一次）：**
-   ```bash
-   mkdir -p .claude
-   cp .workflow/.claude/workflow/auto-activate.snippet.json .claude/settings.json
-   # 若已有 settings 文件，用 jq 合并：
-   # jq -s '.[0] * .[1]' .claude/settings.json .workflow/.claude/workflow/auto-activate.snippet.json > /tmp/merged.json && mv /tmp/merged.json .claude/settings.json
-   ```
-
-3. **启动 Claude Code：**
-   ```bash
-   claude
-   ```
-   首次启动时工作流静默自动激活。submodule 路径默认为 `.workflow/`；
-   如需自定义（如 `vendor/workflow/`），设置 `WF_SUBMODULE_PATH=vendor/workflow` 后重启。
-
-## 以复制方式安装（备用）
-
-无法使用 Git submodule 时：
-```bash
-make -C <path-to-workflow-repo> install-copy TARGET=~/your-project
-```
-说明：复制所有 `wf-*` 文件和 `.claude/workflow/` 目录；需要 `jq` 自动合并 settings。
-
-## 版本管理系统（可选）
-
-工作流支持可选的自动版本号管理系统。安装方式：
+把 `.claude/` 目录复制到你的项目根目录即可：
 
 ```bash
-bash .claude/workflow/install-version.sh --target $(pwd)
-# 或者通过 make 目标
-make -C .workflow install-version TARGET=$(pwd)
+cp -r /path/to/workflow/.claude /your/project/
 ```
 
-此脚本在目标项目中安装：
-- `.github/workflows/version-bump.yml` — 自动版本增量 CI 脚本
-- `scripts/python_scripts/version_manager.py` — 版本管理命令行工具
-- `scripts/python_scripts/analyze_commits.py` — 提交分析脚本
-- `.version` — 初始版本文件（若不存在）
-
-版本管理系统与 wf 工作流完全独立，不包含在默认安装中。重复安装时脚本会检测到已存在的配置并拒绝覆盖。
-
-## 卸载
+然后启动 Claude Code：
 
 ```bash
-make -C .workflow uninstall                    # 标准卸载
-make -C .workflow uninstall ARGS=--clean-settings  # 同时清理 settings
+cd /your/project
+claude
 ```
 
-Submodule 完全移除：
-```bash
-git submodule deinit -f .workflow
-git rm -f .workflow
-git commit -m "Remove workflow submodule"
-```
-
-## 顶层 Make 目标速查表
-
-| Make 目标 | 作用 |
-|---|---|
-| `make install` | submodule 符号链接模式安装 |
-| `make install ARGS=--no-symlink` | submodule 模式下改用复制模式安装（适用于无法创建符号链接的环境，如部分 Windows 或网络文件系统） |
-| `make install-copy TARGET=<dir>` | 复制模式安装（默认 5 个命令） |
-| `make install-copy TARGET=<dir> ARGS=--all` | 复制模式安装（全部命令） |
-| `make install-version TARGET=<dir>` | 安装可选版本管理系统 |
-| `make uninstall` | 卸载工作流 |
-| `make auto-activate` | 安全激活守卫（SessionStart hook 用） |
-| `make clean [ARGS=...]` | 清理 runtime 产物 |
-| `make checkpoint REASON='...'` | 0-token 紧急存档 |
-| `make contribute DESC='...'` | 创建上游贡献分支 |
-| `make contribute-push` | push 并开 PR |
-
-## Slash 命令一览
-
-### 默认安装（5 个）
+## Slash 命令
 
 | 命令 | 作用 | 模型 |
 |---|---|---|
-| `/wf-plan <任务>` | 规划任务 | Opus（planner subagent） |
-| `/wf-dev` | 执行下一步 | Haiku（developer subagent） |
-| `/wf-review` | 审查 `git diff` | Opus（reviewer subagent） |
+| `/wf-plan <任务>` | 规划任务，生成分步计划 | Opus（planner） |
+| `/wf-dev` | 执行计划下一步 | Haiku（developer） |
+| `/wf-review` | 审查 `git diff` | Opus（reviewer） |
 | `/wf-interrupt <改动>` | 修改活跃计划 | 主对话 |
 | `/wf-commit` | 生成 commit 草稿 | 主对话 |
-
-### 可选（--all 时安装）
-
-| 命令 | 作用 | 模型 |
-|---|---|---|
 | `/wf-morning` | 加载昨日上下文 | 主对话 |
 | `/wf-evening` | 每日总结 + 规划明天 | 主对话 |
 | `/wf-handoff` | 为人工审查者做简报 | 主对话 |
-| `/wf-checkpoint <原因>` | 紧急存档（消耗 token） | 主对话 |
-| `/wf-status` | 查看进度 | 主对话 |
+| `/wf-checkpoint` | 紧急存档（消耗 token） | 主对话 |
+| `/wf-status` | 查看计划进度 | 主对话 |
 | `/wf-clean` | 清理运行产物 | 主对话 |
-| `/wf-contribute <描述>` | 为工作流创建贡献分支 | 主对话 |
 
-## 侵入范围
-
-安装后，**顶层唯一新增的是 `.workflow/` submodule**。所有其他内容都在 `.claude/` 内部：
+## .claude/ 目录结构
 
 ```
 .claude/
-├── agents/wf-*.md                    # 4 个带前缀的 agent 定义
-├── commands/wf-*.md                  # 默认 5 个，--all 时 12 个 slash 命令
-├── hooks/wf-*.sh                     # 4 个事件 hook
-├── skills/wf-workflow-intro/         # 1 个 skill
-└── workflow/                         # 唯一新命名空间
-    ├── plans/                        # 活跃计划 + 已完成计划
-    ├── summaries/                    # 每日总结 + 检查点
-    ├── archive/                      # 已完成归档
-    ├── auto-activate.snippet.json    # settings 合并片段
-    ├── install.sh                    # submodule 安装脚本
-    ├── install-version.sh            # 版本管理系统独立安装脚本
-    ├── checkpoint.sh                 # 0-token 紧急存档
-    ├── WORKFLOW.md                   # agent 规则（AI 端）
-    ├── _lib.sh                       # 共享工具库
-    ├── clean.sh                      # 清理脚本
-    └── version-scripts/              # 版本管理系统脚本（可选）
-        ├── version_manager.py        # 版本管理 CLI
-        ├── analyze_commits.py        # 提交分析脚本
-        └── version-bump.yml          # GitHub Actions 模板
+├── agents/wf-*.md            # 4 个子 agent 定义
+├── commands/wf-*.md          # slash 命令
+├── hooks/wf-*.sh             # 4 个事件 hook
+├── skills/wf-workflow-intro/ # intro skill
+├── settings.json             # 权限 + hook + 状态栏配置
+└── workflow/
+    ├── plans/                # 活跃计划
+    ├── summaries/            # 每日总结 / 检查点
+    ├── archive/              # 已完成计划
+    ├── checkpoint.sh         # 0-token 紧急存档（命中用量上限时使用）
+    ├── clean.sh              # 清理脚本
+    └── WORKFLOW.md           # agent 规则
 ```
 
-卸载：`make -C .workflow uninstall` 删除所有内容。
+## 版本管理（可选）
 
-## 贡献回上游
+`.claude/workflow/version-scripts/` 包含独立的版本管理工具：
 
-Submodule 安装后，可在项目内直接贡献改进：
+| 文件 | 用途 |
+|---|---|
+| `version_manager.py` | 版本管理 CLI |
+| `analyze_commits.py` | 提交分析脚本 |
+| `version-bump.yml` | GitHub Actions 自动版本增量模板 |
 
-1. **创建贡献分支：**
-   ```bash
-   make contribute DESC="改进 planner 提示词"
-   ```
+手动复制到目标项目即可使用，与 wf 工作流完全独立。
 
-2. **原地编辑并提交（符号链接自动同步）：**
-   ```bash
-   git -C .workflow commit -am "优化 planner 指令"
-   ```
+## 状态栏
 
-3. **推送并开 PR：**
-   ```bash
-   make contribute-push
-   ```
+`settings.json` 已配置状态栏，Claude Code 底部实时显示：
 
-详见 `make help`。
+```
+claude-sonnet-4-6  Thinking:xhigh  In:12.3k Out:1.2k  Ctx:13.5k/200k  5h:42%(↻ 1h30m)  7d:8%
+```
+
+依赖 `.claude/statusline-command.sh` 和 `.claude/statusline-parse.py`，两个文件已包含在 `.claude/` 中，复制过去即可直接使用。

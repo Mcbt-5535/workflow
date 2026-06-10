@@ -33,12 +33,6 @@ When the user asks a question, gives a one-line fix, or explores: respond direct
 
 The user may open `.claude/workflow/plans/*.md` and edit it directly — add steps, reorder, mark `[?]`. The developer agent will pick up changes on the next `/wf-dev`. The plan is a contract that the user always controls.
 
-## Contributing improvements back to the workflow
-
-When the workflow is installed as a Git submodule, all internal files are editable in place — thanks to symlinks, changes to `.workflow/.claude/agents/wf-planner.md` affect your project immediately without copy-paste or restart. You can branch the submodule, make changes (agents, commands, hooks, skills), commit them, and submit a PR back upstream — all from your project — using `/wf-contribute`. See the README section "Contributing back upstream" for the full flow.
-
-This is the intended way to customize the workflow for your team: edit the agents/commands live in your project, test them in your active plan, commit to a branch, and PR them back. Once approved, the entire team gets the benefit via `git submodule update --remote`.
-
 ## Daily rhythm
 
 - Start: `/wf-morning` (loads yesterday's summary + active plan)
@@ -64,7 +58,7 @@ When the user must shut down RIGHT NOW (meeting, power cut, change of plans):
 
 - `/wf-checkpoint <optional reason>` — manual slash, <60-second save to `.claude/workflow/summaries/<date>-checkpoint-<HHMM>.md`. Uses the model; richest detail (includes mental notes from this conversation).
 - If the user forgets to run `/wf-checkpoint` and just closes Claude Code, the `SessionEnd` hook writes the same kind of file automatically (less detail; bash only).
-- **Usage-limit fallback:** `bash checkpoint.sh "<reason>"` — pure bash, **uses zero tokens**. Use this when the 5-hour limit has been hit and the slash command itself would fail. Captures active plan + git status + recent progress log; same output format.
+- **Usage-limit fallback:** `bash .claude/workflow/checkpoint.sh "<reason>"` — pure bash, **uses zero tokens**. Use this when the 5-hour limit has been hit and the slash command itself would fail. Captures active plan + git status + recent progress log; same output format.
 - Next session: `claude` re-opens here, `SessionStart` hook loads the active plan, and `/wf-morning` reads whichever summary/wf-checkpoint is most recent — picks up where you left off without you re-explaining.
 
 ## Usage-limit (5-hour window) survival
@@ -73,31 +67,28 @@ If the user hits the rolling 5-hour limit:
 
 - All hooks keep working (they're local bash, not API calls). `.claude/workflow/plans/STATUS.md` and `.claude/workflow/plans/.progress.log` continue to reflect the latest step state.
 - All slash commands (including `/wf-checkpoint`, `/wf-morning`, `/wf-evening`, `/wf-dev`, `/wf-review`, `/wf-plan`) fail because they need the model.
-- The user should run **`bash checkpoint.sh "<reason>"`** from a terminal — pure bash, no tokens. State is preserved.
+- The user should run **`bash .claude/workflow/checkpoint.sh "<reason>"`** from a terminal — pure bash, no tokens. State is preserved.
 - On resume, the user runs `claude` again; the SessionStart hook surfaces the active plan path + progress automatically.
 - If the limit hit mid-`/wf-dev`, the step may be partial: code changed but checkbox still `[ ]`. The checkpoint file's "⚠️ Possible mid-step state" section explains how to decide between continuing vs. `git checkout --`.
 
 ## Version management system (optional)
 
-The workflow ships with an optional, standalone version management system (`install-version.sh`). This system is **completely separate** from the wf agent/command/hook architecture and can be installed independently:
+The workflow ships with a standalone version management system in `.claude/workflow/version-scripts/`:
+
+- `version_manager.py` — CLI tool for version management
+- `analyze_commits.py` — commit analysis script
+- `version-bump.yml` — GitHub Actions CI template for automatic version bumping
+
+Copy these files into your project to use them:
 
 ```bash
-bash .claude/workflow/install-version.sh --target <project-root>
+cp .claude/workflow/version-scripts/version-bump.yml .github/workflows/
+cp .claude/workflow/version-scripts/version_manager.py scripts/
+cp .claude/workflow/version-scripts/analyze_commits.py scripts/
+echo '{"version": "0.0.1"}' > .version
 ```
 
-or via Make:
-
-```bash
-make install-version TARGET=<project-root>
-```
-
-This installs:
-- `.github/workflows/version-bump.yml` — GitHub Actions CI for automatic version bumping
-- `scripts/python_scripts/version_manager.py` — CLI tool for version management
-- `scripts/python_scripts/analyze_commits.py` — commit analysis script
-- `.version` — initial version file (created if missing)
-
-The installer includes duplicate-install protection and creates target directories as needed. After installation, pushing to the main branch will trigger the CI to automatically bump the version based on commit analysis.
+This system is **completely separate** from the wf agent/command/hook architecture.
 
 ## Hard rules for the main agent
 
